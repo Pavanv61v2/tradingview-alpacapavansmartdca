@@ -35,6 +35,7 @@ jobs:
           echo "Order size: ${{ github.event.client_payload.order_size || 'N/A' }}"
           echo "Notional: ${{ github.event.client_payload.notional || 'N/A' }}"
           echo "Price: ${{ github.event.client_payload.price || 'N/A' }}"
+          echo "Fractional: ${{ github.event.client_payload.fractional || 'N/A' }}"
           echo "Alert message: ${{ github.event.client_payload.alert_message || 'N/A' }}"
 
           pip install alpaca-trade-api requests
@@ -78,6 +79,11 @@ jobs:
               except (ValueError, TypeError):
                   return None
 
+          def _parse_bool(v):
+              if v is None: return False
+              s = str(v).strip().lower()
+              return s in ("1","true","yes","y","on")
+
           def _normalize_symbol(sym: str) -> str:
               """
               Normalize common crypto variations:
@@ -93,6 +99,22 @@ jobs:
               if s.endswith('USD'):
                   return s[:-3] + '/USD'
               return s
+
+          def _get_latest_trade_price(api, symbol: str):
+              """
+              Try to fetch latest trade price via Alpaca data API.
+              Works for US equities. Crypto uses a different venue; we avoid for crypto path.
+              """
+              try:
+                  # For alpaca-trade-api, data API v2 latest trade:
+                  lt = api.get_latest_trade(symbol)
+                  px = getattr(lt, "price", None) or getattr(lt, "p", None)
+                  if px is not None:
+                      print(f"[Data] Latest trade price for {symbol}: {px}")
+                      return float(px)
+              except Exception as e:
+                  print(f"[Data] Latest trade price fetch failed for {symbol}: {e}")
+              return None
 
           def place_order():
               try:
@@ -121,7 +143,7 @@ jobs:
                       raise ValueError("No valid action (buy/sell) provided in signal")
                   side = str(action).lower()
 
-                  # Optional fields (qty / notional / price)
+                  # Optional fields
                   qty_raw = _first_present(signal, ['order_size', 'qty', 'quantity'])
                   qty_float = _parse_float(qty_raw)
 
@@ -130,6 +152,8 @@ jobs:
 
                   limit_price_raw = _first_present(signal, ['price', 'limit_price'])
                   limit_price = _parse_float(limit_price_raw)
+
+                  fractional_flag = _parse_bool(_first_present(signal, ['fractional', 'fractional_stock']))
 
                   # Alpaca REST
                   base_url = 'https://paper-api.alpaca.markets' if paper else 'https://api.alpaca.markets'
@@ -140,49 +164,82 @@ jobs:
                   acct = api.get_account()
                   print(f"Account status: {acct.status}; Portfolio value: {acct.portfolio_value}")
 
-                  is_crypto = '/' in symbol  # simple but effective
+                  is_crypto = '/' in symbol  # crypto pairs carry '/'
 
-                  # ---- VALIDATIONS per Alpaca rules ----
+                  # Guards / validations
                   if notional is not None and limit_price is not None:
-                      # Alpaca: notional cannot be used with limit/stop; only market
-                      raise ValueError("Invalid combination: 'notional' cannot be sent with 'price'. Use qty for limit orders.")
+                      # To keep behavior predictable: do not mix notional with limit here.
+                      raise ValueError("Invalid combination: 'notional' cannot be sent together with 'price'. Use qty for limit orders.")
 
-                  if is_crypto and notional is not None:
-                      # Alpaca: crypto does NOT support notional
-                      raise ValueError("Invalid input: 'notional' is not supported for crypto. Use 'order_size'/'qty' instead.")
+                  if is_crypto and (fractional_flag or notional is not None):
+                      # Alpaca crypto does NOT support notional.
+                      print("[Info] Ignoring 'fractional/notional' for crypto; using qty path.")
+                      notional = None
+                      fractional_flag = False
 
-                  # ---- BUILD ORDER PARAMS ----
+                  # Build base order params
                   params = {
                       'symbol': symbol,
                       'side': side,
                       'time_in_force': 'gtc' if is_crypto else 'day'
                   }
 
-                  # SIZE + TYPE decision tree
-                  if notional is not None and notional > 0:
-                      # STOCKS + NOTIONAL => MARKET only (fractional $ support)
-                      params['notional'] = notional
-                      params['type'] = 'market'
-                      order_type = 'market'
-                      print(f"[BRANCH] STOCK notional market order: ${notional}")
-                  else:
-                      # QTY path (stocks must be integer; crypto may be fractional)
-                      if qty_float is None or qty_float <= 0:
-                          qty_float = 1.0
-                      params['qty'] = qty_float if is_crypto else int(qty_float)
+                  # ---------- Decision Tree ----------
+                  order_type = None
+                  computed_notional = None
+                  reference_px_used = None
 
-                      if limit_price is not None and limit_price > 0:
-                          # LIMIT order (works for both stocks and crypto)
-                          params['type'] = 'limit'
-                          params['limit_price'] = limit_price
-                          order_type = 'limit'
-                          print(f"[BRANCH] Qty-based LIMIT order @ {limit_price}")
-                      else:
-                          # MARKET order
+                  if (not is_crypto) and fractional_flag:
+                      # FRACTIONAL STOCKS PATH
+                      # Prefer explicit notional if already provided.
+                      if notional is not None and notional > 0:
+                          params['notional'] = notional
                           params['type'] = 'market'
                           order_type = 'market'
-                          print(f"[BRANCH] Qty-based MARKET order")
+                          print(f"[BRANCH] Fractional STOCK notional (explicit): ${notional}")
+                      else:
+                          # Compute notional = qty * reference price
+                          if qty_float is None or qty_float <= 0:
+                              raise ValueError("fractional=true requires a valid positive 'order_size/qty' for stocks.")
 
+                          # Choose reference price: payload price (if any), else fetch latest trade
+                          ref_px = limit_price if (limit_price is not None and limit_price > 0) else _get_latest_trade_price(api, symbol)
+                          if ref_px is None:
+                              raise ValueError("Could not determine a reference price to compute notional. Provide 'price' in payload or enable data access.")
+
+                          computed_notional = float(qty_float) * float(ref_px)
+                          # Place as MARKET notional for broad compatibility
+                          params['notional'] = computed_notional
+                          params['type'] = 'market'
+                          order_type = 'market'
+                          reference_px_used = ref_px
+                          print(f"[BRANCH] Fractional STOCK notional (computed): qty={qty_float} * px={ref_px} -> ${computed_notional:.2f}")
+
+                  else:
+                      # DEFAULT / NON-FRACTIONAL PATH
+                      # Use explicit notional if provided (stocks only)
+                      if (not is_crypto) and (notional is not None and notional > 0):
+                          params['notional'] = notional
+                          params['type'] = 'market'
+                          order_type = 'market'
+                          print(f"[BRANCH] STOCK notional market: ${notional}")
+                      else:
+                          # Qty-based path
+                          if qty_float is None or qty_float <= 0:
+                              qty_float = 1.0
+                          params['qty'] = qty_float if is_crypto else int(qty_float)
+
+                          if limit_price is not None and limit_price > 0:
+                              params['type'] = 'limit'
+                              params['limit_price'] = limit_price
+                              order_type = 'limit'
+                              print(f"[BRANCH] Qty-based LIMIT order @ {limit_price}")
+                          else:
+                              params['type'] = 'market'
+                              order_type = 'market'
+                              print(f"[BRANCH] Qty-based MARKET order")
+
+                  # Submit
                   print(f"Submitting {order_type.upper()} {side} order with params: {params}")
                   order = api.submit_order(**params)
                   print(f"Order placed: id={order.id}, status={getattr(order, 'status', 'submitted')}")
@@ -195,6 +252,8 @@ jobs:
                       'limitPrice': limit_price,
                       'qty': params.get('qty'),
                       'notional': params.get('notional'),
+                      'referencePriceUsed': reference_px_used,
+                      'fractionalRequested': fractional_flag,
                       'timeInForce': params.get('time_in_force'),
                       'orderId': order.id,
                       'status': 'success'
