@@ -236,5 +236,17 @@
     "orderSize": 1.0,
     "orderId": "eb15f4e0-6f87-494b-aebc-2dfdb568ff11",
     "status": "success"
+  },
+  {
+    "timestamp": "2025-11-06T07:42:29.399201",
+    "symbol": "TSLA",
+    "action": "buy",
+    "orderType": "limit",
+    "limitPrice": 158.62,
+    "qty": 1,
+    "notional": null,
+    "timeInForce": "day",
+    "orderId": "2f20bb0a-ff6b-44dc-94c3-d406df0ca372",
+    "status": "success"
   }
 ]
