@@ -24,7 +24,7 @@ jobs:
         env:
           ALPACA_API_KEY: '${{ secrets.ALPACA_API_KEY }}'
           ALPACA_API_SECRET: '${{ secrets.ALPACA_API_SECRET }}'
-          ALPACA_PAPER_TRADING: '${{ secrets.ALPACA_PAPER_TRADING }}'
+          ALPACA_PAPER_TRADING: '${{ secrets.ALPACA_PAPER_TRADING }}'   # "true" or "false"
           SIGNAL_DATA: '${{ toJson(github.event.client_payload) }}'
           NOTIFICATIONS_ENABLED: 'true'
           NOTIFICATION_EMAIL: '${{ secrets.NOTIFICATION_EMAIL }}'
@@ -83,16 +83,16 @@ jobs:
               Normalize common crypto variations:
               - BTCUSDT -> BTC/USD
               - BTCUSD  -> BTC/USD
-              Leaves stock tickers unchanged.
+              Leaves stock tickers unchanged (AAPL, TSLA, etc.)
               """
               s = sym.upper().replace(' ', '')
               if '/' in s:
-                  return s  # already slash format (often fine for Alpaca crypto)
+                  return s
               if s.endswith('USDT'):
                   return s[:-4] + '/USD'
               if s.endswith('USD'):
                   return s[:-3] + '/USD'
-              return s  # likely a stock ticker such as AAPL
+              return s
 
           def place_order():
               try:
@@ -103,14 +103,14 @@ jobs:
                   if not api_key or not api_secret:
                       raise ValueError("Alpaca API credentials not provided")
 
-                  # Signal payload
+                  # Payload
                   raw = os.environ.get('SIGNAL_DATA')
                   if not raw:
                       raise ValueError("No signal data provided")
                   signal = json.loads(raw)
                   print(f"Processing signal: {signal}")
 
-                  # Core fields
+                  # Required fields
                   symbol = _first_present(signal, ['symbol', 'ticker'])
                   if not symbol:
                       raise ValueError("No symbol provided in signal")
@@ -121,57 +121,71 @@ jobs:
                       raise ValueError("No valid action (buy/sell) provided in signal")
                   side = str(action).lower()
 
-                  # Quantity or notional
-                  order_size = _first_present(signal, ['order_size', 'qty', 'quantity'])
-                  notional = _parse_float(_first_present(signal, ['notional', 'amount_usd', 'usd']))
+                  # Optional fields (qty / notional / price)
+                  qty_raw = _first_present(signal, ['order_size', 'qty', 'quantity'])
+                  qty_float = _parse_float(qty_raw)
 
-                  qty_float = _parse_float(order_size)
-                  # Price for potential LIMIT order
-                  limit_price = _parse_float(_first_present(signal, ['price', 'limit_price']))
+                  notional_raw = _first_present(signal, ['notional', 'amount_usd', 'usd'])
+                  notional = _parse_float(notional_raw)
 
+                  limit_price_raw = _first_present(signal, ['price', 'limit_price'])
+                  limit_price = _parse_float(limit_price_raw)
+
+                  # Alpaca REST
                   base_url = 'https://paper-api.alpaca.markets' if paper else 'https://api.alpaca.markets'
                   print(f"Connecting to Alpaca API: {base_url}")
                   api = tradeapi.REST(api_key, api_secret, base_url, api_version='v2')
 
-                  # Quick account log
+                  # Account log
                   acct = api.get_account()
                   print(f"Account status: {acct.status}; Portfolio value: {acct.portfolio_value}")
 
-                  is_crypto = '/' in symbol  # crude but effective distinguisher
+                  is_crypto = '/' in symbol  # simple but effective
 
-                  # Build order params
+                  # ---- VALIDATIONS per Alpaca rules ----
+                  if notional is not None and limit_price is not None:
+                      # Alpaca: notional cannot be used with limit/stop; only market
+                      raise ValueError("Invalid combination: 'notional' cannot be sent with 'price'. Use qty for limit orders.")
+
+                  if is_crypto and notional is not None:
+                      # Alpaca: crypto does NOT support notional
+                      raise ValueError("Invalid input: 'notional' is not supported for crypto. Use 'order_size'/'qty' instead.")
+
+                  # ---- BUILD ORDER PARAMS ----
                   params = {
                       'symbol': symbol,
                       'side': side,
+                      'time_in_force': 'gtc' if is_crypto else 'day'
                   }
 
-                  # TIME-IN-FORCE: common defaults
-                  # Stocks: 'day' (you can change to 'gtc' if you prefer)
-                  # Crypto: 'gtc' (no sessions)
-                  params['time_in_force'] = 'gtc' if is_crypto else 'day'
-
-                  # Sizing rules:
-                  # - If notional present, prefer notional (stocks & crypto supported)
-                  # - Else fall back to qty (stocks require int shares; crypto can be fractional)
+                  # SIZE + TYPE decision tree
                   if notional is not None and notional > 0:
+                      # STOCKS + NOTIONAL => MARKET only (fractional $ support)
                       params['notional'] = notional
+                      params['type'] = 'market'
+                      order_type = 'market'
+                      print(f"[BRANCH] STOCK notional market order: ${notional}")
                   else:
+                      # QTY path (stocks must be integer; crypto may be fractional)
                       if qty_float is None or qty_float <= 0:
                           qty_float = 1.0
                       params['qty'] = qty_float if is_crypto else int(qty_float)
 
-                  # Order type selection
-                  if limit_price is not None and limit_price > 0:
-                      params['type'] = 'limit'
-                      params['limit_price'] = limit_price
-                      order_type = 'limit'
-                  else:
-                      params['type'] = 'market'
-                      order_type = 'market'
+                      if limit_price is not None and limit_price > 0:
+                          # LIMIT order (works for both stocks and crypto)
+                          params['type'] = 'limit'
+                          params['limit_price'] = limit_price
+                          order_type = 'limit'
+                          print(f"[BRANCH] Qty-based LIMIT order @ {limit_price}")
+                      else:
+                          # MARKET order
+                          params['type'] = 'market'
+                          order_type = 'market'
+                          print(f"[BRANCH] Qty-based MARKET order")
 
                   print(f"Submitting {order_type.upper()} {side} order with params: {params}")
                   order = api.submit_order(**params)
-                  print(f"Order placed: id={order.id}, status={order.status}")
+                  print(f"Order placed: id={order.id}, status={getattr(order, 'status', 'submitted')}")
 
                   trade_info = {
                       'timestamp': datetime.now().isoformat(),
