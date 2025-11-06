@@ -272,5 +272,17 @@
     "timeInForce": "day",
     "orderId": "1f086f98-10c1-4a3a-ad66-40f709a5834a",
     "status": "success"
+  },
+  {
+    "timestamp": "2025-11-06T08:29:03.367826",
+    "symbol": "TSLA",
+    "action": "buy",
+    "orderType": "market",
+    "limitPrice": null,
+    "qty": null,
+    "notional": 100.0,
+    "timeInForce": "day",
+    "orderId": "189567dc-6569-4158-af4f-b3c6b103b377",
+    "status": "success"
   }
 ]
