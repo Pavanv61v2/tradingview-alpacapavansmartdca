@@ -305,5 +305,19 @@
     "limitPrice": null,
     "status": "failed",
     "error": "qty must be > 0"
+  },
+  {
+    "timestamp": "2025-11-06T08:57:56.068747",
+    "symbol": "TSLA",
+    "action": "buy",
+    "orderType": "market",
+    "limitPrice": null,
+    "qty": null,
+    "notional": 92.44,
+    "referencePriceUsed": 462.2,
+    "fractionalRequested": true,
+    "timeInForce": "day",
+    "orderId": "6042b01c-eace-47e9-b842-d4626a81ff77",
+    "status": "success"
   }
 ]
