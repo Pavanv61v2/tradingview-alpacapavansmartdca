@@ -213,5 +213,20 @@
     "orderSize": 1.0,
     "orderId": "3f75e256-f033-4aeb-9efc-7b81653aed82",
     "status": "success"
+  },
+  {
+    "timestamp": "2025-11-06T06:41:00.871339",
+    "symbol": "SOL/USD",
+    "action": "buy",
+    "orderSize": 1.0,
+    "status": "failed",
+    "error": "crypto orders not allowed for account"
+  },
+  {
+    "timestamp": "2025-11-06T06:41:00.872014",
+    "symbol": "SOL/USD",
+    "action": "buy",
+    "status": "failed",
+    "error": "crypto orders not allowed for account"
   }
 ]
