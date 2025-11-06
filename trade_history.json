@@ -296,5 +296,14 @@
     "timeInForce": "day",
     "orderId": "c49d0a9a-d9be-42fd-a84b-dc672d51d26f",
     "status": "success"
+  },
+  {
+    "timestamp": "2025-11-06T08:51:28.119281",
+    "symbol": "TSLA",
+    "action": "buy",
+    "orderType": "unknown",
+    "limitPrice": null,
+    "status": "failed",
+    "error": "qty must be > 0"
   }
 ]
