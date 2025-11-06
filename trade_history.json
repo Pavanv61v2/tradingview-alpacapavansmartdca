@@ -228,5 +228,13 @@
     "action": "buy",
     "status": "failed",
     "error": "crypto orders not allowed for account"
+  },
+  {
+    "timestamp": "2025-11-06T07:22:23.781097",
+    "symbol": "TSLA",
+    "action": "buy",
+    "orderSize": 1.0,
+    "orderId": "eb15f4e0-6f87-494b-aebc-2dfdb568ff11",
+    "status": "success"
   }
 ]
