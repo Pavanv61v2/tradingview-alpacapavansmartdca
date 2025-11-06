@@ -1,0 +1,14 @@
+{
+  "timestamp": "2025-11-06T14:13:24.895054",
+  "symbol": "TSLA",
+  "action": "buy",
+  "qty": 0.5,
+  "notional": 231.1,
+  "limitPrice": null,
+  "orderType": "market",
+  "timeInForce": "day",
+  "allowShort": false,
+  "fractionalRequested": true,
+  "status": "failed",
+  "error": "insufficient buying power"
+}
