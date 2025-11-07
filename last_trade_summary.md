@@ -2,9 +2,9 @@
 
 
 
-**Time:** 2025-11-06T14:13:24.895054
+**Time:** 2025-11-07T09:40:50.386318
 
-**Symbol:** TSLA
+**Symbol:** ASST
 
 **Action:** buy
 
@@ -14,14 +14,10 @@
 
 **Allow Short:** False
 
-**Fractional Requested:** True
+**Fractional Requested:** False
 
-**Qty:** 0.5
+**Qty:** 3
 
-**Notional:** $231.1
+**Order ID:** e1d37f95-e59f-497d-ac41-7ec137d7d99e
 
-**Status:** failed
-
-
-
-**Error:** `insufficient buying power`
+**Status:** success

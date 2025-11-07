@@ -1,14 +1,14 @@
 {
-  "timestamp": "2025-11-06T14:13:24.895054",
-  "symbol": "TSLA",
+  "timestamp": "2025-11-07T09:40:50.386318",
+  "symbol": "ASST",
   "action": "buy",
-  "qty": 0.5,
-  "notional": 231.1,
+  "qty": 3,
+  "notional": null,
   "limitPrice": null,
   "orderType": "market",
-  "timeInForce": "day",
   "allowShort": false,
-  "fractionalRequested": true,
-  "status": "failed",
-  "error": "insufficient buying power"
+  "fractionalRequested": false,
+  "timeInForce": "day",
+  "status": "success",
+  "orderId": "e1d37f95-e59f-497d-ac41-7ec137d7d99e"
 }

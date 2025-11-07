@@ -347,5 +347,19 @@
     "fractionalRequested": true,
     "status": "failed",
     "error": "insufficient buying power"
+  },
+  {
+    "timestamp": "2025-11-07T09:40:50.386318",
+    "symbol": "ASST",
+    "action": "buy",
+    "qty": 3,
+    "notional": null,
+    "limitPrice": null,
+    "orderType": "market",
+    "allowShort": false,
+    "fractionalRequested": false,
+    "timeInForce": "day",
+    "status": "success",
+    "orderId": "e1d37f95-e59f-497d-ac41-7ec137d7d99e"
   }
 ]
