@@ -2,13 +2,13 @@
 
 
 
-**Time:** 2025-11-08T03:52:58.494708
+**Time:** 2025-11-08T03:54:52.592895
 
 **Symbol:** ASST
 
 **Action:** buy
 
-**Order Type:** market
+**Order Type:** limit
 
 **Time in Force:** day
 
@@ -18,6 +18,8 @@
 
 **Qty:** 3
 
-**Order ID:** 1728bd6d-fcd3-4bd3-a586-0160a1b1f0ef
+**Limit Price:** 1.4
+
+**Order ID:** ac635fe8-d0f7-48ca-acb0-bce0480dad2b
 
 **Status:** success

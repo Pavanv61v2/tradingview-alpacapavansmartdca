@@ -375,5 +375,19 @@
     "timeInForce": "day",
     "status": "success",
     "orderId": "1728bd6d-fcd3-4bd3-a586-0160a1b1f0ef"
+  },
+  {
+    "timestamp": "2025-11-08T03:54:52.592895",
+    "symbol": "ASST",
+    "action": "buy",
+    "qty": 3,
+    "notional": null,
+    "limitPrice": 1.4,
+    "orderType": "limit",
+    "allowShort": false,
+    "fractionalRequested": false,
+    "timeInForce": "day",
+    "status": "success",
+    "orderId": "ac635fe8-d0f7-48ca-acb0-bce0480dad2b"
   }
 ]
